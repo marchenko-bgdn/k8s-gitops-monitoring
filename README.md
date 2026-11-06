@@ -1,75 +1,30 @@
-# DevOps Test Task
+# k8s-gitops-monitoring
 
-This repository bootstraps a local GitOps Kubernetes environment using **Minikube** and **Argo CD**, and deploys a monitoring stack (**VictoriaMetrics + Grafana**) and a demo application (**spam2000**) that exposes Prometheus metrics.
-
----
-
-## Stack
-
-- **Kubernetes (local):** Minikube
-- **GitOps:** Argo CD (Helm install) + Root Application
-- **Monitoring:** VictoriaMetrics stack (vmstack) + Grafana
-- **App:** spam2000 (metrics generator)
+A local GitOps Kubernetes environment bootstrapped with a single command.
+Argo CD (app-of-apps pattern) deploys a VictoriaMetrics + Grafana monitoring
+stack and a demo application (**spam2000**) that exposes Prometheus metrics,
+scraped automatically and visualized on a Grafana dashboard defined as code.
 
 ---
 
-## Prerequisites
+## Repository structure
 
-Installed locally:
-
-- Docker Desktop
-- `kubectl`
-- `helm`
-- `minikube`
-- `make`
-
-You can install tools via Homebrew:
-
-```bash
-brew install kubectl helm minikube
+```text
+clusters/minikube/       # Argo CD root app, namespaces and child applications
+  apps/                  # monitoring, dashboards, spam2000 apps
+helm/spam2000/           # Helm chart for the demo app (Deployment, Service, VMServiceScrape)
+dashboards/              # Grafana dashboard provisioned as code
+hack/                    # helper scripts: up/down, port-forwards for Argo CD and Grafana
+Makefile                 # make up / make down entry points
 ```
 
-## Quick start
+## How it works
 
-Start everything:
-
-```bash
-make up
-```
-
-`make up` does the following:
-1. Starts Minikube profile `minikube`
-2. Creates namespaces (`argocd`, `monitoring`, `apps`)
-3. Installs Argo CD using Helm
-4. Applies root app (`clusters/minikube/root-app.yaml`)
-5. Waits for Argo CD apps to become `Synced` and `Healthy`
-6. Starts local port-forwards for Argo CD and Grafana
-
-Stop and clean up:
-
-```bash
-make down
-```
-
-This stops background port-forwards and deletes the Minikube profile.
-
-## Access
-
-After `make up`:
-- Argo CD: `http://127.0.0.1:8080`
-- Grafana: `http://127.0.0.1:3000`
-
-Default credentials:
-- Argo CD: user `admin`, password is printed by `make up`
-- Grafana: user `admin`, password is printed by `make up`
-
-## Optional configuration
-
-You can override defaults when starting:
-
-```bash
-MINIKUBE_PROFILE=minikube MINIKUBE_CPUS=4 MINIKUBE_MEMORY=7680 MINIKUBE_DISK=30g \
-ARGOCD_PORT=8080 GRAFANA_PORT=3000 make up
-```
-
-If ports `8080` or `3000` are busy, use different values (for example `ARGOCD_PORT=18080 GRAFANA_PORT=13000 make up`).
+- **GitOps:** everything after the Argo CD install is driven from Git — the root
+  application points Argo CD at `clusters/minikube/apps`, which defines all other apps.
+- **Monitoring:** the VictoriaMetrics stack collects metrics; the app's Helm chart
+  ships a `VMServiceScrape`, so new deployments are scraped without manual config.
+- **Dashboards as code:** the Grafana dashboard is stored in the repo and
+  provisioned automatically.
+- **Reproducible environment:** `make up` / `make down` create and fully tear down
+  the cluster, so the whole setup can be rebuilt from scratch.
